@@ -28,6 +28,7 @@
 
 #define kData @"data"
 
+
 @interface InstagramEngine()
 {
     dispatch_queue_t mBackgroundQueue;
@@ -53,9 +54,7 @@
         return nil;
     }
     
-	mBackgroundQueue = dispatch_queue_create("background", NULL);
-    [self registerHTTPOperationClass:[AFJSONRequestOperation class]];
-    [self setDefaultHeader:@"Accept" value:@"application/json"];
+    mBackgroundQueue = dispatch_queue_create("background", NULL);
     
     return self;
 }
@@ -63,42 +62,43 @@
 #pragma mark - Base Call -
 
 - (void)getPath:(NSString*)path
-     responseModel:(Class)modelClass
+  responseModel:(Class)modelClass
      parameters:(NSDictionary *)parameters
         success:(void (^)(id response))success
         failure:(void (^)(NSError* error, NSInteger statusCode))failure
 {
     NSMutableDictionary *params = [NSMutableDictionary dictionaryWithDictionary:parameters];
+    
     if (self.accessToken) {
         [params setObject:self.accessToken forKey:kKeyAccessToken];
     }
     [params setObject:APP_CLIENT_ID forKey:kKeyClientID];
-    [super getPath:path
-        parameters:params
-           success:^(AFHTTPRequestOperation *operation, id responseObject) {
-               NSDictionary *responseDictionary = (NSDictionary *)responseObject;
-               BOOL collection = ([responseDictionary[kData] isKindOfClass:[NSArray class]]);
-               if (collection) {
-                   NSArray *responseObjects = responseDictionary[kData];
-                   NSMutableArray*objects = [NSMutableArray arrayWithCapacity:responseObjects.count];
-                   dispatch_async(mBackgroundQueue, ^{
-                       for (NSDictionary *info in responseObjects) {
-                           id model = [[modelClass alloc] initWithInfo:info];
-                           [objects addObject:model];
-                       }
-                       dispatch_async(dispatch_get_main_queue(), ^{
-                           success(objects);
-                       });
-                   });
-               }
-               else {
-                   id model = [[modelClass alloc] initWithInfo:responseDictionary[kData]];
-                   success(model);
-               }
-           }
-           failure:^(AFHTTPRequestOperation *operation, NSError *error) {
-               failure(error,[[operation response] statusCode]);
-           }];
+    
+    [self GET:path parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSLog(@"JSON: %@", responseObject);
+        NSDictionary *responseDictionary = (NSDictionary *)responseObject;
+        BOOL collection = ([responseDictionary[kData] isKindOfClass:[NSArray class]]);
+        if (collection) {
+            NSArray *responseObjects = responseDictionary[kData];
+            NSMutableArray*objects = [NSMutableArray arrayWithCapacity:responseObjects.count];
+            dispatch_async(mBackgroundQueue, ^{
+                for (NSDictionary *info in responseObjects) {
+                    id model = [[modelClass alloc] initWithInfo:info];
+                    [objects addObject:model];
+                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    success(objects);
+                });
+            });
+        }
+        else {
+            id model = [[modelClass alloc] initWithInfo:responseDictionary[kData]];
+            success(model);
+        }
+        
+    } failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        NSLog(@"Error: %@", error);
+    }];
 }
 
 
@@ -116,8 +116,8 @@
 }
 
 - (void)getMedia:(NSString *)mediaId
-               withSuccess:(void (^)(InstagramMedia *media))success
-                   failure:(void (^)(NSError* error))failure
+     withSuccess:(void (^)(InstagramMedia *media))success
+         failure:(void (^)(NSError* error))failure
 {
     [self getPath:[NSString stringWithFormat:@"media/%@",mediaId] responseModel:[InstagramMedia class] parameters:nil success:^(id response) {
         InstagramMedia *media = response;
@@ -130,8 +130,8 @@
 #pragma mark - Users -
 
 - (void)getUserDetails:(InstagramUser *)user
-     withSuccess:(void (^)(InstagramUser *userDetail))success
-         failure:(void (^)(NSError* error))failure
+           withSuccess:(void (^)(InstagramUser *userDetail))success
+               failure:(void (^)(NSError* error))failure
 {
     [self getPath:[NSString stringWithFormat:@"users/%@",user.Id] responseModel:[InstagramUser class] parameters:nil success:^(id response) {
         InstagramUser *userDetail = response;
@@ -142,8 +142,8 @@
 }
 
 - (void)getMediaForUser:(NSString *)userId count:(NSInteger)count
-        withSuccess:(void (^)(NSArray *feed))success
-            failure:(void (^)(NSError* error))failure
+            withSuccess:(void (^)(NSArray *feed))success
+                failure:(void (^)(NSError* error))failure
 {
     [self getPath:[NSString stringWithFormat:@"users/%@/media/recent",userId] responseModel:[InstagramMedia class] parameters:@{[NSString stringWithFormat:@"%d",count]:kCount} success:^(id response) {
         NSArray *objects = response;
@@ -152,14 +152,14 @@
     } failure:^(NSError *error, NSInteger statusCode) {
         failure(error);
     }];
-
+    
 }
 
 #pragma mark - Tags -
 
 - (void)getMediaWithTag:(NSString *)tag
-        withSuccess:(void (^)(NSArray *feed))success
-            failure:(void (^)(NSError* error))failure
+            withSuccess:(void (^)(NSArray *feed))success
+                failure:(void (^)(NSError* error))failure
 {
     [self getPath:[NSString stringWithFormat:@"tags/%@/media/recent",tag] responseModel:[InstagramMedia class] parameters:nil success:^(id response) {
         NSArray *objects = response;
@@ -175,9 +175,9 @@
 
 - (void)getSelfFeed:(NSInteger)count
         withSuccess:(void (^)(NSArray *feed))success
-                failure:(void (^)(NSError* error))failure
+            failure:(void (^)(NSError* error))failure
 {
-    [self getPath:[NSString stringWithFormat:@"/users/self/feed"] responseModel:[InstagramMedia class] parameters:nil success:^(id response) {
+    [self getPath:@"users/self/feed/" responseModel:[InstagramMedia class] parameters:nil success:^(id response) {
         NSArray *objects = response;
         success(objects);
         
